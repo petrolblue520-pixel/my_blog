@@ -1,0 +1,936 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>10点覆盖问题 - 几何辅助验证工具</title>
+  <style>
+    :root {
+      --primary-color: #2c3e50;
+      --accent-color: #3498db;
+      --danger-color: #e74c3c;
+      --success-color: #2ecc71;
+      --aux-color: #8e44ad; /* 辅助圆专属紫色 */
+      --bg-color: #f8f9fa;
+      --panel-bg: rgba(255, 255, 255, 0.92);
+      --border-color: #e0e0e0;
+      --text-color: #333333;
+      --shadow: 0 4px 18px rgba(0,0,0,0.08);
+      --radius: 10px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    body, html {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+    }
+
+    #canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      cursor: grab;
+    }
+
+    #canvas.grabbing { cursor: grabbing; }
+    #canvas.crosshair { cursor: crosshair; }
+    #canvas.delete-mode { cursor: not-allowed; }
+
+    /* 顶部悬浮工具栏 */
+    .floating-toolbar {
+      position: absolute;
+      top: 18px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--panel-bg);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.8);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 6px 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      z-index: 100;
+      flex-wrap: wrap;
+      max-width: 95vw;
+      justify-content: center;
+    }
+
+    .tool-btn {
+      background: transparent;
+      border: 1px solid transparent;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--primary-color);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+    }
+
+    .tool-btn:hover { background-color: rgba(52, 152, 219, 0.1); }
+    .tool-btn.active {
+      background-color: var(--accent-color);
+      color: white;
+      border-color: var(--accent-color);
+      box-shadow: 0 2px 8px rgba(52, 152, 219, 0.3);
+    }
+
+    .tool-btn.delete-btn.active {
+      background-color: var(--danger-color);
+      border-color: var(--danger-color);
+      box-shadow: 0 2px 8px rgba(231, 76, 60, 0.3);
+    }
+
+    .tool-btn.aux-btn.active {
+      background-color: var(--aux-color);
+      border-color: var(--aux-color);
+      box-shadow: 0 2px 8px rgba(142, 68, 173, 0.3);
+    }
+
+    .divider {
+      width: 1px;
+      height: 24px;
+      background-color: var(--border-color);
+      margin: 0 2px;
+    }
+
+    .icon-btn {
+      background: transparent;
+      border: 1px solid var(--border-color);
+      width: 32px;
+      height: 32px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: var(--primary-color);
+      transition: all 0.2s;
+    }
+    .icon-btn:hover { background: #f0f0f0; }
+
+    /* 左下角状态卡片 */
+    .status-card {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      background: var(--panel-bg);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.8);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 14px 18px;
+      z-index: 100;
+      min-width: 220px;
+    }
+
+    .status-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #7f8c8d;
+      margin-bottom: 8px;
+    }
+
+    .status-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 14px;
+      margin-bottom: 6px;
+    }
+
+    .status-value { font-weight: 700; }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .badge-ok { background-color: rgba(46, 204, 113, 0.15); color: #27ae60; }
+    .badge-warn { background-color: rgba(231, 76, 60, 0.15); color: #c0392b; }
+
+    /* 右侧属性面板 */
+    .inspector-panel {
+      position: absolute;
+      top: 18px;
+      right: 20px;
+      background: var(--panel-bg);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.8);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 16px;
+      width: 260px;
+      z-index: 100;
+      display: none;
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .panel-title { font-size: 15px; font-weight: 700; color: var(--primary-color); }
+    .close-btn { background: none; border: none; font-size: 18px; cursor: pointer; color: #95a5a6; }
+
+    .prop-group { margin-bottom: 12px; }
+    .prop-label { font-size: 12px; color: #7f8c8d; margin-bottom: 4px; display: block; }
+    .prop-input {
+      width: 100%;
+      padding: 6px 10px;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      font-size: 13px;
+      outline: none;
+    }
+
+    .color-picker-group { display: flex; gap: 8px; align-items: center; }
+    .color-picker {
+      -webkit-appearance: none;
+      border: none;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      cursor: pointer;
+      background: none;
+    }
+    .color-picker::-webkit-color-swatch { border: 2px solid var(--border-color); border-radius: 50%; }
+
+    .hint-toast {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      background: rgba(0,0,0,0.7);
+      color: white;
+      padding: 8px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      pointer-events: none;
+      z-index: 100;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="floating-toolbar">
+    <button class="tool-btn active" id="btn-select" onclick="setTool('select')">
+      <span>🖐️</span> 移动
+    </button>
+    <button class="tool-btn" id="btn-point" onclick="toggleTool('addPoint')">
+      <span>📍</span> 点
+    </button>
+    <button class="tool-btn" id="btn-circle" onclick="toggleTool('addCircle')">
+      <span>⭕</span> 标准圆 (R=1)
+    </button>
+    <button class="tool-btn aux-btn" id="btn-aux" onclick="toggleTool('addAuxCircle')">
+      <span>🟣</span> 辅助圆 (R=2)
+    </button>
+    
+    <div class="divider"></div>
+
+    <button class="tool-btn" onclick="generateHexTangencyGroup()" title="生成7个R=2相切圆阵列">
+      <span>🕸️</span> 六边相切阵列
+    </button>
+    <button class="tool-btn" onclick="generateHexStarGroup()" title="生成6个R=2圆交中心点阵列">
+      <span>🔯</span> 六角包围阵列
+    </button>
+
+    <div class="divider"></div>
+
+    <button class="tool-btn delete-btn" id="btn-delete" onclick="toggleTool('delete')">
+      <span>🗑️</span> 删除
+    </button>
+    <button class="icon-btn" onclick="resetView()" title="重置视角">🎯</button>
+    <button class="icon-btn" onclick="clearAll()" title="清空画布">💥</button>
+  </div>
+
+  <div class="status-card">
+    <div class="status-title">10点覆盖验证器</div>
+    <div class="status-item">
+      <span>已放置点数：</span>
+      <span class="status-value" id="stat-points">0 / 10</span>
+    </div>
+    <div class="status-item">
+      <span>覆盖百分比：</span>
+      <span class="status-value" id="stat-coverage">0%</span>
+    </div>
+    <div class="status-item">
+      <span>标准圆重叠：</span>
+      <span id="stat-overlap-badge" class="badge badge-ok">无重叠</span>
+    </div>
+  </div>
+
+  <div class="inspector-panel" id="inspector">
+    <div class="panel-header">
+      <span class="panel-title" id="inspector-title">属性详情</span>
+      <button class="close-btn" onclick="deselectObject()">&times;</button>
+    </div>
+    <div class="prop-group">
+      <label class="prop-label">名称 / 标签</label>
+      <input type="text" class="prop-input" id="prop-name" oninput="updateSelectedProps()">
+    </div>
+    <div class="prop-group">
+      <label class="prop-label">坐标 (X, Y)</label>
+      <div style="display:flex; gap:6px;">
+        <input type="number" step="0.01" class="prop-input" id="prop-x" oninput="updateSelectedProps()">
+        <input type="number" step="0.01" class="prop-input" id="prop-y" oninput="updateSelectedProps()">
+      </div>
+    </div>
+    <div class="prop-group">
+      <label class="prop-label">颜色</label>
+      <div class="color-picker-group">
+        <input type="color" class="color-picker" id="prop-color" onchange="updateSelectedProps()">
+        <span id="prop-color-hex" style="font-size: 12px; color:#666;">#000000</span>
+      </div>
+    </div>
+    <button class="tool-btn delete-btn" style="width: 100%; justify-content: center; margin-top: 8px;" onclick="deleteSelected()">
+      删除对象
+    </button>
+  </div>
+
+  <div class="hint-toast" id="hint-toast">提示：微调步进0.01，方向键/WASD均可使用</div>
+
+  <canvas id="canvas"></canvas>
+
+  <script>
+    const state = {
+      activeTool: 'select',
+      viewport: {
+        offsetX: window.innerWidth / 2,
+        offsetY: window.innerHeight / 2,
+        zoom: 60,
+        isDragging: false,
+        dragStart: { x: 0, y: 0 }
+      },
+
+      standardRadius: 1.0, // 标准圆 R = 1.0
+      auxRadius: 2.0,      // 辅助圆 R = 2.0
+
+      points: [],
+      circles: [],
+
+      selectedObject: null, 
+      showInspector: false,
+
+      draggedObject: null,
+      dragOffset: { x: 0, y: 0 }
+    };
+
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      render();
+    }
+    window.addEventListener('resize', resizeCanvas);
+
+    // ==========================================
+    // 名称复位管理系统
+    // ==========================================
+    function getNextPointName() {
+      const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+      const usedNames = new Set(state.points.map(p => p.name));
+      let index = 0;
+      while (true) {
+        let name = (index < 26) ? alphabet[index] : alphabet[index % 26] + Math.floor(index / 26);
+        if (!usedNames.has(name)) return name;
+        index++;
+      }
+    }
+
+    function getNextCircleName(prefix = 'O') {
+      const usedNumbers = new Set(
+        state.circles
+          .filter(c => c.name.startsWith(prefix))
+          .map(c => parseInt(c.name.replace(prefix, '')))
+          .filter(n => !isNaN(n))
+      );
+
+      let num = 1;
+      while (usedNumbers.has(num)) num++;
+      return prefix + num;
+    }
+
+    // ==========================================
+    // 绝对精确坐标转换
+    // ==========================================
+    function toWorldPos(clientX, clientY) {
+      const rect = canvas.getBoundingClientRect();
+      return {
+        x: (clientX - rect.left - state.viewport.offsetX) / state.viewport.zoom,
+        y: (state.viewport.offsetY - (clientY - rect.top)) / state.viewport.zoom
+      };
+    }
+
+    function toScreenPos(worldX, worldY) {
+      return {
+        x: worldX * state.viewport.zoom + state.viewport.offsetX,
+        y: state.viewport.offsetY - worldY * state.viewport.zoom
+      };
+    }
+
+    // ==========================================
+    // 工具状态管理
+    // ==========================================
+    function setTool(toolName) {
+      state.activeTool = toolName;
+      updateToolUI();
+    }
+
+    function toggleTool(toolName) {
+      setTool(state.activeTool === toolName ? 'select' : toolName);
+    }
+
+    function updateToolUI() {
+      document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
+      canvas.className = '';
+
+      const toast = document.getElementById('hint-toast');
+
+      if (state.activeTool === 'select') {
+        document.getElementById('btn-select').classList.add('active');
+        canvas.classList.add('grabbing');
+        toast.innerText = '鼠标模式：拖动对象，微调分度值0.01（WASD/方向键）';
+      } else if (state.activeTool === 'addPoint') {
+        document.getElementById('btn-point').classList.add('active');
+        canvas.classList.add('crosshair');
+        toast.innerText = '创建点模式：点击放置点';
+      } else if (state.activeTool === 'addCircle') {
+        document.getElementById('btn-circle').classList.add('active');
+        canvas.classList.add('crosshair');
+        toast.innerText = '创建标准圆模式：点击放置 R=1 的圆';
+      } else if (state.activeTool === 'addAuxCircle') {
+        document.getElementById('btn-aux').classList.add('active');
+        canvas.classList.add('crosshair');
+        toast.innerText = '创建辅助圆模式：点击放置 R=2 的紫色辅助圆（无重叠约束）';
+      } else if (state.activeTool === 'delete') {
+        document.getElementById('btn-delete').classList.add('active');
+        canvas.classList.add('delete-mode');
+        toast.innerText = '删除模式：点击点或圆直接删除';
+      }
+    }
+
+    function resetView() {
+      state.viewport.zoom = 60;
+      state.viewport.offsetX = window.innerWidth / 2;
+      state.viewport.offsetY = window.innerHeight / 2;
+      render();
+    }
+
+    function clearAll() {
+      if (confirm('确定要清空画布上的所有内容吗？')) {
+        state.points = [];
+        state.circles = [];
+        deselectObject();
+        render();
+      }
+    }
+
+    // ==========================================
+    // 快捷阵列生成工具 (六边形系)
+    // ==========================================
+    // 1. 7个 R=2 的圆互相紧密相切
+    function generateHexTangencyGroup() {
+      const center = toWorldPos(window.innerWidth / 2, window.innerHeight / 2);
+      const R = state.auxRadius; // 2.0
+      const dist = 2 * R; // 4.0 (两圆心相切距离)
+
+      // 中心圆
+      state.circles.push({
+        id: 'c_' + Date.now() + '_center',
+        name: getNextCircleName('A'),
+        x: parseFloat(center.x.toFixed(2)),
+        y: parseFloat(center.y.toFixed(2)),
+        radius: R,
+        isAux: true,
+        color: '#8e44ad'
+      });
+
+      // 外围 6 个相切圆
+      for (let i = 0; i < 6; i++) {
+        const angle = (Math.PI / 3) * i; // 60度
+        const cx = center.x + dist * Math.cos(angle);
+        const cy = center.y + dist * Math.sin(angle);
+        state.circles.push({
+          id: 'c_' + Date.now() + '_' + i,
+          name: getNextCircleName('A'),
+          x: parseFloat(cx.toFixed(2)),
+          y: parseFloat(cy.toFixed(2)),
+          radius: R,
+          isAux: true,
+          color: '#8e44ad'
+        });
+      }
+      render();
+    }
+
+    // 2. 中间一个点，周围6个 R=2 的圆，圆弧均交于中心点
+    function generateHexStarGroup() {
+      const center = toWorldPos(window.innerWidth / 2, window.innerHeight / 2);
+      const R = state.auxRadius; // 2.0
+
+      // 中心点
+      const centerPoint = {
+        id: 'p_' + Date.now() + '_center',
+        name: getNextPointName(),
+        x: parseFloat(center.x.toFixed(2)),
+        y: parseFloat(center.y.toFixed(2)),
+        color: '#2980b9'
+      };
+      state.points.push(centerPoint);
+
+      // 周围 6 个 R=2 圆（圆心距离中心点等于 R=2，因此圆弧必然过中心点）
+      for (let i = 0; i < 6; i++) {
+        const angle = (Math.PI / 3) * i; // 60度
+        const cx = center.x + R * Math.cos(angle);
+        const cy = center.y + R * Math.sin(angle);
+        state.circles.push({
+          id: 'c_' + Date.now() + '_' + i,
+          name: getNextCircleName('A'),
+          x: parseFloat(cx.toFixed(2)),
+          y: parseFloat(cy.toFixed(2)),
+          radius: R,
+          isAux: true,
+          color: '#8e44ad'
+        });
+      }
+      render();
+    }
+
+    // ==========================================
+    // 几何约束判断
+    // ==========================================
+    function checkConstraints() {
+      let hasOverlap = false;
+
+      // 重置标准圆的重叠标志
+      state.circles.forEach(c => c.isOverlapping = false);
+
+      // 仅检测【标准圆 (R=1)】之间的相互重叠，辅助圆忽略重叠
+      const stdCircles = state.circles.filter(c => !c.isAux);
+
+      for (let i = 0; i < stdCircles.length; i++) {
+        for (let j = i + 1; j < stdCircles.length; j++) {
+          const c1 = stdCircles[i];
+          const c2 = stdCircles[j];
+          if (Math.hypot(c1.x - c2.x, c1.y - c2.y) < 2 * state.standardRadius - 0.0001) {
+            c1.isOverlapping = true;
+            c2.isOverlapping = true;
+            hasOverlap = true;
+          }
+        }
+      }
+
+      // 点覆盖逻辑：被【任意圆（标准圆或辅助圆）】覆盖均算作覆盖
+      let coveredCount = 0;
+      state.points.forEach(p => {
+        p.isCovered = state.circles.some(c => Math.hypot(p.x - c.x, p.y - c.y) <= c.radius + 0.0001);
+        if (p.isCovered) coveredCount++;
+      });
+
+      document.getElementById('stat-points').innerText = `${state.points.length} / 10`;
+      const pct = state.points.length > 0 ? Math.round((coveredCount / state.points.length) * 100) : 0;
+      document.getElementById('stat-coverage').innerText = `${pct}% (${coveredCount}/${state.points.length})`;
+
+      const badge = document.getElementById('stat-overlap-badge');
+      if (hasOverlap) {
+        badge.className = 'badge badge-warn';
+        badge.innerText = '标准圆重叠 ⚠️';
+      } else {
+        badge.className = 'badge badge-ok';
+        badge.innerText = '无重叠 ✓';
+      }
+    }
+
+    // ==========================================
+    // 拾取检测
+    // ==========================================
+    function hitTest(worldPos) {
+      const pointTolerance = 12 / state.viewport.zoom;
+
+      for (let i = state.points.length - 1; i >= 0; i--) {
+        const p = state.points[i];
+        if (Math.hypot(p.x - worldPos.x, p.y - worldPos.y) <= pointTolerance) {
+          return { type: 'point', item: p };
+        }
+      }
+
+      for (let i = state.circles.length - 1; i >= 0; i--) {
+        const c = state.circles[i];
+        if (Math.hypot(c.x - worldPos.x, c.y - worldPos.y) <= c.radius) {
+          return { type: 'circle', item: c };
+        }
+      }
+      return null;
+    }
+
+    // ==========================================
+    // 鼠标交互事件
+    // ==========================================
+    let isMouseDown = false;
+
+    canvas.addEventListener('mousedown', (e) => {
+      isMouseDown = true;
+      const worldPos = toWorldPos(e.clientX, e.clientY);
+
+      if (state.activeTool === 'select') {
+        const target = hitTest(worldPos);
+        if (target) {
+          selectObject(target, true);
+          state.draggedObject = target;
+          state.dragOffset = { x: target.item.x - worldPos.x, y: target.item.y - worldPos.y };
+        } else {
+          deselectObject();
+          state.viewport.isDragging = true;
+          state.viewport.dragStart = { x: e.clientX, y: e.clientY };
+        }
+      } else if (state.activeTool === 'addPoint') {
+        const newPoint = {
+          id: 'p_' + Date.now(),
+          name: getNextPointName(),
+          x: parseFloat(worldPos.x.toFixed(2)),
+          y: parseFloat(worldPos.y.toFixed(2)),
+          color: '#2980b9'
+        };
+        state.points.push(newPoint);
+        selectObject({ type: 'point', item: newPoint }, false); 
+        render();
+      } else if (state.activeTool === 'addCircle') {
+        const newCircle = {
+          id: 'c_' + Date.now(),
+          name: getNextCircleName('O'),
+          x: parseFloat(worldPos.x.toFixed(2)),
+          y: parseFloat(worldPos.y.toFixed(2)),
+          radius: state.standardRadius,
+          isAux: false,
+          color: '#e67e22'
+        };
+        state.circles.push(newCircle);
+        selectObject({ type: 'circle', item: newCircle }, false); 
+        render();
+      } else if (state.activeTool === 'addAuxCircle') {
+        const newAuxCircle = {
+          id: 'c_' + Date.now(),
+          name: getNextCircleName('A'),
+          x: parseFloat(worldPos.x.toFixed(2)),
+          y: parseFloat(worldPos.y.toFixed(2)),
+          radius: state.auxRadius,
+          isAux: true,
+          color: '#8e44ad'
+        };
+        state.circles.push(newAuxCircle);
+        selectObject({ type: 'circle', item: newAuxCircle }, false); 
+        render();
+      } else if (state.activeTool === 'delete') {
+        const target = hitTest(worldPos);
+        if (target) deleteObject(target);
+      }
+    });
+
+    canvas.addEventListener('mousemove', (e) => {
+      if (!isMouseDown) return;
+      const worldPos = toWorldPos(e.clientX, e.clientY);
+
+      if (state.viewport.isDragging) {
+        state.viewport.offsetX += e.clientX - state.viewport.dragStart.x;
+        state.viewport.offsetY += e.clientY - state.viewport.dragStart.y;
+        state.viewport.dragStart = { x: e.clientX, y: e.clientY };
+        render();
+        return;
+      }
+
+      if (state.draggedObject) {
+        state.draggedObject.item.x = parseFloat((worldPos.x + state.dragOffset.x).toFixed(2));
+        state.draggedObject.item.y = parseFloat((worldPos.y + state.dragOffset.y).toFixed(2));
+        updateInspectorValues();
+        render();
+      }
+    });
+
+    window.addEventListener('mouseup', () => {
+      isMouseDown = false;
+      state.viewport.isDragging = false;
+      state.draggedObject = null;
+    });
+
+    canvas.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const zoomFactor = 1.1;
+      const mouseX = e.clientX;
+      const mouseY = e.clientY;
+      const worldBefore = toWorldPos(mouseX, mouseY);
+
+      if (e.deltaY < 0) state.viewport.zoom *= zoomFactor;
+      else state.viewport.zoom /= zoomFactor;
+
+      state.viewport.zoom = Math.max(10, Math.min(300, state.viewport.zoom));
+
+      const rect = canvas.getBoundingClientRect();
+      state.viewport.offsetX = (mouseX - rect.left) - worldBefore.x * state.viewport.zoom;
+      state.viewport.offsetY = (mouseY - rect.top) + worldBefore.y * state.viewport.zoom;
+
+      render();
+    }, { passive: false });
+
+    // ==========================================
+    // 键盘移动逻辑（微调0.01 / 方向键与WASD / Shift规则）
+    // ==========================================
+    window.addEventListener('keydown', (e) => {
+      if (document.activeElement.tagName === 'INPUT') return;
+
+      const isShift = e.shiftKey;
+      const key = e.key;
+      const isWASD = ['w', 'a', 's', 'd', 'W', 'A', 'S', 'D'].includes(key);
+      const isArrow = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(key);
+
+      // 按下 Shift 时 WASD 失效
+      if (isShift && isWASD) return;
+
+      if (isWASD || isArrow) {
+        e.preventDefault();
+
+        // 选中对象时微调分度值：默认 0.01；若按下 Shift 并且是方向键则为 0.2
+        const objStep = (isShift && isArrow) ? 0.2 : 0.01;
+
+        if (state.selectedObject) {
+          const item = state.selectedObject.item;
+
+          if (key === 'ArrowUp' || key === 'w' || key === 'W') item.y = parseFloat((item.y + objStep).toFixed(4));
+          if (key === 'ArrowDown' || key === 's' || key === 'S') item.y = parseFloat((item.y - objStep).toFixed(4));
+          if (key === 'ArrowLeft' || key === 'a' || key === 'A') item.x = parseFloat((item.x - objStep).toFixed(4));
+          if (key === 'ArrowRight' || key === 'd' || key === 'D') item.x = parseFloat((item.x + objStep).toFixed(4));
+
+          updateInspectorValues();
+          render();
+        } 
+        // 未选中对象时平移画布视角
+        else {
+          const panStep = isShift ? 60 : 15;
+          if (key === 'ArrowUp' || key === 'w' || key === 'W') state.viewport.offsetY += panStep;
+          if (key === 'ArrowDown' || key === 's' || key === 'S') state.viewport.offsetY -= panStep;
+          if (key === 'ArrowLeft' || key === 'a' || key === 'A') state.viewport.offsetX += panStep;
+          if (key === 'ArrowRight' || key === 'd' || key === 'D') state.viewport.offsetX -= panStep;
+          render();
+        }
+      }
+
+      if (key === 'Delete' || key === 'Backspace') {
+        if (state.selectedObject) deleteSelected();
+      }
+    });
+
+    // ==========================================
+    // 属性面板与交互
+    // ==========================================
+    function selectObject(target, showPanel = true) {
+      state.selectedObject = target;
+      state.showInspector = showPanel;
+
+      const panel = document.getElementById('inspector');
+      if (showPanel) {
+        panel.style.display = 'block';
+        document.getElementById('inspector-title').innerText = 
+          target.type === 'point' ? '点属性' : (target.item.isAux ? '辅助圆属性 (R=2)' : '标准圆属性 (R=1)');
+        updateInspectorValues();
+      } else {
+        panel.style.display = 'none';
+      }
+      render();
+    }
+
+    function deselectObject() {
+      state.selectedObject = null;
+      state.showInspector = false;
+      document.getElementById('inspector').style.display = 'none';
+      render();
+    }
+
+    function updateInspectorValues() {
+      if (!state.selectedObject || !state.showInspector) return;
+      const obj = state.selectedObject.item;
+
+      document.getElementById('prop-name').value = obj.name;
+      document.getElementById('prop-x').value = obj.x;
+      document.getElementById('prop-y').value = obj.y;
+      document.getElementById('prop-color').value = obj.color;
+      document.getElementById('prop-color-hex').innerText = obj.color;
+    }
+
+    function updateSelectedProps() {
+      if (!state.selectedObject) return;
+      const obj = state.selectedObject.item;
+
+      obj.name = document.getElementById('prop-name').value;
+      obj.x = parseFloat(document.getElementById('prop-x').value) || 0;
+      obj.y = parseFloat(document.getElementById('prop-y').value) || 0;
+      obj.color = document.getElementById('prop-color').value;
+      document.getElementById('prop-color-hex').innerText = obj.color;
+
+      render();
+    }
+
+    function deleteSelected() {
+      if (state.selectedObject) {
+        deleteObject(state.selectedObject);
+        deselectObject();
+      }
+    }
+
+    function deleteObject(target) {
+      if (target.type === 'point') {
+        state.points = state.points.filter(p => p.id !== target.item.id);
+      } else if (target.type === 'circle') {
+        state.circles = state.circles.filter(c => c.id !== target.item.id);
+      }
+      if (state.selectedObject && state.selectedObject.item.id === target.item.id) {
+        deselectObject();
+      }
+      render();
+    }
+
+    // ==========================================
+    // 渲染 Engine
+    // ==========================================
+    function drawGrid() {
+      const width = canvas.width;
+      const height = canvas.height;
+      const zoom = state.viewport.zoom;
+
+      ctx.clearRect(0, 0, width, height);
+
+      const step = zoom;
+      const startX = state.viewport.offsetX % step;
+      const startY = state.viewport.offsetY % step;
+
+      ctx.beginPath();
+      ctx.strokeStyle = '#eef2f5';
+      ctx.lineWidth = 1;
+
+      for (let x = startX; x < width; x += step) {
+        ctx.moveTo(x, 0); ctx.lineTo(x, height);
+      }
+      for (let y = startY; y < height; y += step) {
+        ctx.moveTo(0, y); ctx.lineTo(width, y);
+      }
+      ctx.stroke();
+
+      // X/Y 轴
+      ctx.beginPath();
+      ctx.strokeStyle = '#b0bec5';
+      ctx.lineWidth = 2;
+      ctx.moveTo(0, state.viewport.offsetY); ctx.lineTo(width, state.viewport.offsetY);
+      ctx.moveTo(state.viewport.offsetX, 0); ctx.lineTo(state.viewport.offsetX, height);
+      ctx.stroke();
+
+      ctx.fillStyle = '#78909c';
+      ctx.font = '11px sans-serif';
+      ctx.fillText('(0,0)', state.viewport.offsetX + 5, state.viewport.offsetY + 15);
+    }
+
+    function render() {
+      checkConstraints();
+      drawGrid();
+
+      const zoom = state.viewport.zoom;
+
+      // 1. 绘制所有圆（包含标准圆 R=1 与辅助圆 R=2）
+      state.circles.forEach(c => {
+        const screenPos = toScreenPos(c.x, c.y);
+        const radiusPx = c.radius * zoom;
+        const isSelected = state.selectedObject && state.selectedObject.item.id === c.id;
+
+        ctx.beginPath();
+        ctx.arc(screenPos.x, screenPos.y, radiusPx, 0, Math.PI * 2);
+
+        if (c.isAux) {
+          // 辅助圆：淡紫填充，紫色虚线边框
+          ctx.fillStyle = 'rgba(142, 68, 173, 0.08)';
+          ctx.fill();
+          ctx.lineWidth = isSelected ? 3 : 1.5;
+          ctx.strokeStyle = isSelected ? '#3498db' : c.color;
+          ctx.setLineDash([4, 4]);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        } else {
+          // 标准圆：受重叠约束影响
+          ctx.fillStyle = c.isOverlapping ? 'rgba(231, 76, 60, 0.15)' : c.color + '22';
+          ctx.fill();
+          ctx.lineWidth = isSelected ? 3 : 2;
+          ctx.strokeStyle = c.isOverlapping ? '#e74c3c' : (isSelected ? '#3498db' : c.color);
+          if (c.isOverlapping) ctx.setLineDash([6, 4]);
+          else ctx.setLineDash([]);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
+
+        // 绘制圆心
+        ctx.beginPath();
+        ctx.arc(screenPos.x, screenPos.y, 3, 0, Math.PI * 2);
+        ctx.fillStyle = c.color;
+        ctx.fill();
+
+        // 标签
+        ctx.font = 'bold 12px sans-serif';
+        ctx.fillStyle = c.isAux ? '#6c3483' : (c.isOverlapping ? '#c0392b' : '#2c3e50');
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(c.name, screenPos.x, screenPos.y - 12);
+      });
+
+      // 2. 绘制所有点
+      state.points.forEach(p => {
+        const screenPos = toScreenPos(p.x, p.y);
+        const isSelected = state.selectedObject && state.selectedObject.item.id === p.id;
+
+        ctx.beginPath();
+        ctx.arc(screenPos.x, screenPos.y, isSelected ? 11 : 7, 0, Math.PI * 2);
+        ctx.fillStyle = isSelected ? 'rgba(52, 152, 219, 0.4)' : (p.isCovered ? 'rgba(46, 204, 113, 0.3)' : 'rgba(231, 76, 60, 0.2)');
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.arc(screenPos.x, screenPos.y, 5, 0, Math.PI * 2);
+        ctx.fillStyle = p.isCovered ? '#2ecc71' : (p.color || '#3498db');
+        ctx.fill();
+        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = '#ffffff';
+        ctx.stroke();
+
+        ctx.font = '12px sans-serif';
+        ctx.fillStyle = '#34495e';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'bottom';
+        ctx.fillText(`${p.name} (${p.x}, ${p.y})`, screenPos.x + 8, screenPos.y - 4);
+      });
+    }
+
+    resizeCanvas();
+    updateToolUI();
+  </script>
+</body>
+</html>
