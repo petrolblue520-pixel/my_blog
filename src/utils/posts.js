@@ -36,8 +36,12 @@ export function getHtmlFile(name) {
 }
 
 // 按文件名取图片 URL（找不到返回 null）
+// 兼容两种写法：纯文件名（cover: xxx.jpg）或相对路径（cover: ../needed_file_code_picture_video/xxx.jpg）
+// 内部统一取路径最后一段文件名去匹配图片文件夹
 export function getImageUrl(name) {
-  const entry = Object.entries(imageFiles).find(([path]) => path.endsWith('/' + name))
+  if (!name) return null
+  const fileName = decodeURIComponent(String(name).split('/').pop())
+  const entry = Object.entries(imageFiles).find(([path]) => path.endsWith('/' + fileName))
   return entry ? entry[1] : null
 }
 

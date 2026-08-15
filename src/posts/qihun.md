@@ -2,7 +2,7 @@
 title: 棋魂nb
 date: 2026-08-10
 tags: [电视剧, 棋魂, 兴趣]
-cover: qihunjuzhan.jpg
+cover: ../needed_file_code_picture_video/qihunjuzhan.jpg
 ---
 
 ![棋魂](../needed_file_code_picture_video/qihunjuzhan.jpg)

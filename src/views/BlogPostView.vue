@@ -17,6 +17,10 @@ const post = computed(() => getPostBySlug(props.slug))
     </header>
 
     <article v-if="post" class="article">
+      <!-- 文章封面图（frontmatter 里配了 cover 才显示） -->
+      <div v-if="post.cover" class="cover">
+        <img :src="post.cover" :alt="post.title" />
+      </div>
       <h1>{{ post.title }}</h1>
       <div class="meta">
         <span class="date">📅 {{ post.date }}</span>
@@ -84,6 +88,18 @@ const post = computed(() => getPostBySlug(props.slug))
   color: #2d3047;
   margin: 0 0 12px;
   line-height: 1.3;
+}
+.cover {
+  margin: 0 0 24px;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 6px 18px rgba(60, 80, 100, 0.12);
+}
+.cover img {
+  display: block;
+  width: 100%;
+  max-height: 300px;
+  object-fit: cover;
 }
 .meta {
   display: flex;

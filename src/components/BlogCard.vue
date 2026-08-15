@@ -32,12 +32,13 @@ const cover = computed(() => {
   return { background: `linear-gradient(135deg, ${from}, ${to})` }
 })
 
-// 根据 tags 选一个 emoji 当封面图标
+// 根据 tags 选一个 emoji 当封面图标（没配 cover 图片时用）
 const emoji = computed(() => {
   const tagMap = {
     Vue: '🌿', 前端: '⚡', 学习: '📚', 部署: '🚀', Cloudflare: '☁️',
-    上线: '🌐', CSS: '🎨', 动画: '✨', 设计: '🖌️', 生活: '☕',
+    上线: '🌐', CSS: '🎨', css: '🎨', 动画: '✨', 设计: '🖌️', 生活: '☕',
     随笔: '✍️', 开始: '🌱',
+    数学: '📐', 代码: '💻', 电视剧: '📺', 棋魂: '♟️', 兴趣: '🌟', html: '🧱',
   }
   for (const t of props.post.tags) {
     if (tagMap[t]) return tagMap[t]
