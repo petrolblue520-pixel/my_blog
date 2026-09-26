@@ -1,4 +1,5 @@
 import MarkdownIt from 'markdown-it'
+import { applyMath } from './markdown-math'
 
 // 创建一个 markdown 解析器实例
 const md = new MarkdownIt({
@@ -6,6 +7,9 @@ const md = new MarkdownIt({
   linkify: true,
   typographer: true,
 })
+
+// 开启 LaTeX 数学公式支持（$...$ / $$...$$ / \(...\) / \[...\]）
+applyMath(md)
 
 // 用 import.meta.glob 把 src/posts 下所有 .md 文件以原始文本形式加载进来
 // eager: true 表示构建时就打包好，运行时直接拿到内容

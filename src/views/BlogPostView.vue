@@ -178,6 +178,47 @@ const post = computed(() => getPostBySlug(props.slug))
   color: #5a6473;
 }
 
+/* LaTeX 公式（KaTeX 渲染） */
+.markdown-body :deep(.math-block) {
+  /* 过宽的公式横向滚动，不撑破正文宽度 */
+  overflow-x: auto;
+  overflow-y: hidden;
+  margin: 18px 0;
+  padding: 2px 0;
+  text-align: center;
+}
+/* 居中但内容超宽时左对齐，保证左侧内容能完整看到 */
+.markdown-body :deep(.math-block .katex-display) {
+  display: inline-block;
+  margin: 0;
+}
+.markdown-body :deep(.math-block::-webkit-scrollbar) {
+  height: 6px;
+}
+.markdown-body :deep(.math-block::-webkit-scrollbar-thumb) {
+  background: #dfe5ec;
+  border-radius: 3px;
+}
+/* 带编号公式：$$ ... $$ (1) */
+.markdown-body :deep(.math-block-eqno) {
+  position: relative;
+  padding-right: 40px;
+}
+.markdown-body :deep(.math-block-eqno .math-eqno) {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #9aa3b5;
+  font-size: 13px;
+}
+/* 公式写错时 KaTeX 会标红，允许换行避免溢出 */
+.markdown-body :deep(.katex-error) {
+  color: #cc0000;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .not-found {
   text-align: center;
   padding: 80px 20px;
